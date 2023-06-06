@@ -1,0 +1,287 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <title></title>
+    <link rel="stylesheet" href="./layui/css/layui.css">
+    <script src="./layui/layui.js"></script>
+    <script src="./common.js"></script>
+</head>
+<body>
+    <!-- 多条件查询 -->
+    <form class="layui-form">
+        <div class="layui-form-item">
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: auto;">标题</label>
+                <div class="layui-input-inline">
+                    <input id="title_search" type="text" name="username" placeholder="请输入日记标题" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-inline">
+                <label class="layui-form-label" style="width: auto;">分类</label>
+                <div class="layui-input-inline">
+                  <select id="typeid_search" name="status" lay-verify="required">
+                    <option value="">全部</option>
+                  </select>
+                </div>
+              </div>
+            <div class="layui-inline">
+                <button type="button" class="layui-btn layui-btn-normal" onclick="doSearch()">查询</button>
+            </div>
+        </div>
+    </form>
+
+    <table class="layui-table" id="diaryList">
+        <!-- <thead>
+            <tr>
+                <th>序号</th>
+                <th>标题</th>
+                <th>内容</th>
+                <th>日记类型</th>
+                <th>发布时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>1</td>
+                <td>aaa</td>
+                <td>aaa</td>
+                <td>学习心得</td>
+                <td>2022-02-14 12:30:25</td>
+                <td>
+                    <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="doModify()">编辑</button>
+                    <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="doDelete()">删除</button>
+                </td>
+            </tr>
+        </tbody> -->
+    </table>
+    <!-- 分页容器 -->
+    <div id="pagination" style="text-align: center;"></div>
+
+    <!-- 修改弹出层 -->
+    <div id="modifyLayer" style="display: none; margin-top: 30px;margin-right: 40px; width: 400px;">
+        <form class="layui-form" id="modifyForm" lay-filter="formModify">
+            <input type="hidden" id="idModify" name="id" class="layui-input" readonly>
+            <div class="layui-form-item">
+                <label class="layui-form-label">标题</label>
+                <div class="layui-input-block">
+                    <input type="text" name="title" id="titleModify" required lay-verify="required" placeholder="请输入日记标题"
+                        class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">内容</label>
+                <div class="layui-input-block">
+                    <textarea name="content" id="contentModify" placeholder="请输入日志内容" class="layui-textarea"></textarea>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">分类</label>
+                <div class="layui-input-block">
+                    <select name="typeId" id="typeIdModify" lay-verify="required" name="type.typeid">
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <div class="layui-input-block">
+                    <button class="layui-btn" lay-submit lay-filter="modify" type="button"
+                            style="width: 180px;" onclick="doModify()">修&nbsp;&nbsp;&nbsp;&nbsp;改
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+    
+    <script>
+        layui.use(['layer', 'laypage', 'form', 'upload','table'], function () {
+            var layer = layui.layer
+            var laypage = layui.laypage;
+            var $ = layui.jquery
+            var form = layui.form
+            var table = layui.table;
+            var upload = layui.upload;
+
+
+            $.ajax({
+                type:'post',
+                url:baseUrl+'/types',
+                datatype:'json',
+                success:function(res){
+                    // console.log(res.data[1]);
+                    if (res.data){
+                        for (var i = 0; i < res.data.length; i++){
+                            // console.log(res.data[i].typeid);
+                            $("#typeid_search,#typeIdModify").append(new Option(res.data[i].typename,res.data[i].typeid));
+
+                        }
+                    }
+                    layui.form.render("select");//重新渲染 固定写法
+                }
+            })
+
+            // console.log(123);
+            // form.render();
+
+            //执行一个laypage实例
+            // laypage.render({
+            //     elem: 'pagination', //分页容器的id
+            //     count: 10, //数据总数
+            //     limit: 3, //每页显示的数据条数
+            //     curr: 2, // 当前页码
+            //     layout: ['prev', 'page', 'next', 'count', 'skip'],  //自定义排版
+            //     jump: function (obj, first) { // obj包含当前分页的信息，first表示是否执行
+            //     if (!first) {
+            //         layer.msg('第' + obj.curr + '页');
+            //     }
+            //     }
+            // });
+
+            table.render({
+                elem:'#diaryList'
+                // ,type:'post'
+                ,url:baseUrl+'/diary/findByPage'
+                ,page:true
+                ,limit:3
+                ,limits:[1,3,5,50]
+                ,request:{
+                    pageName: 'pageNum' //页码的参数名称，默认：page
+                    ,limitName: 'pageSize'
+                }
+                ,parseData: function(res){
+                        return{
+                        "code":'',
+                        "count": res.total,
+                        "data":res.list
+                    }
+                }
+
+                ,cols: [[ //表头
+                    {field: 'id', title: '序号', sort: true,align:'center',type: "numbers",width:80}
+                    ,{field: 'title', title: '标题',align:'center'}
+                    ,{field: 'content', title: '内容',align:'center'}
+                    ,{field: '', title: '日记类型',align:'center',templet:function(data){
+                        return(data.type.typename)
+                    }}
+                    ,{field:'createtime',title:'发布时间',alert:'center'}
+                    ,{field: 'id', title: '操作',align:'center',templet: function(data){
+                    var str = `
+                        <button class="layui-btn layui-btn-sm layui-btn-normal" onclick="toModify(${data.id})">编辑</button>
+                        <button class="layui-btn layui-btn-sm layui-btn-danger" onclick="doDelete(${data.id})">删除</button>
+                                    `;
+                    return str
+                    }}
+
+                ]]
+
+            })
+
+        });
+
+        /**
+         * 删除
+         */
+        function doDelete(id) {
+            layui.use('layer', function () {
+                var layer = layui.layer
+                var $ = layui.jquery
+                layer.confirm('确定要删除吗', { icon: 3, title: '提示信息' }, function (index) {
+
+                    $.ajax({
+                        type:'delete',
+                        url:baseUrl+'/diary/doDelete',
+                        data:{id},
+                        datatype:'json',
+                        success:function(res){
+                            if (res.code==0){
+                                layer.msg('删除成功',{icon:1,time:1000},function (){
+                                    layer.closeAll()
+                                    document.location.reload()
+                                })
+                            }
+                        }
+                    })
+                    layer.close(index)
+                });
+            })
+        }
+
+        /**
+         * 修改
+         */
+        function toModify(id) {
+            layui.use(['layer', 'form'], function () {
+                var layer = layui.layer
+                var $ = layui.jquery
+                var form = layui.form
+
+                layer.open({
+                    type: 1,
+                    title: '修改管理员信息',
+                    content: $('#modifyLayer'),
+                })
+
+                $.ajax({
+                    type:'get',
+                    url:baseUrl+'/diary/toModify',
+                    data:{id},
+                    datatype:'json',
+                    success:function(res){
+                        $('#idModify').val(res.data.id),
+                        $('#titleModify').val(res.data.title),
+                        $('#contentModify').val(res.data.content),
+                        $('#typeIdModify').val(res.data.type.typeid)
+
+                        layui.form.render('select');
+                    }
+                })
+
+            })
+        }
+
+        function doModify(){
+            layui.use(['layer', 'laypage', ], function () {
+            var layer = layui.layer
+            var laypage = layui.laypage;
+            var $ = layui.jquery
+
+            $.ajax({
+                type:'put',
+                url:baseUrl+'/diary/doModify',
+                data:{
+                    id:$('#idModify').val(),
+                    title:$('#titleModify').val(),
+                    content:$('#contentModify').val(),
+                    typeId:$('#typeIdModify').val()
+                },
+                datatype:'json',
+                success:function(res){
+                    if(res.code==0){
+                        layer.msg('修改成功',{icon:1,time:1000},function (){
+                            layer.closeAll()
+                            document.location.reload()
+                        })
+                    }
+                }
+            })
+
+
+        })
+        }
+
+        function doSearch(){
+            layui.use(['table'],function (){
+            var table=layui.table;
+            var $=layui.jquery
+                table.reload('diaryList',{
+                    url:baseUrl+'/diary/findByPage'
+                    ,where:{
+                        title:$('#title_search').val(),
+                        typeid:$('#typeid_search').val()
+                    }
+                })
+            })
+        }
+
+    </script>
+</body>
+</html>
